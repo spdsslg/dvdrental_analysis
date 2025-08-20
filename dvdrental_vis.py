@@ -74,6 +74,12 @@ def save_heatmap(mat_df, title, outpath):
     plt.close()
 
 
+def ecdf(x):
+    x = np.sort(np.asarray(x))
+    y = np.arange(1,len(x)+1)/len(x)
+    return x,y
+
+
 with eng.connect() as conn:
     df = pd.read_sql_query(text("SELECT 1 AS ok"), conn)
 print(df)
@@ -195,7 +201,47 @@ def num_of_rentals_per_family_categories():
         df = pd.read_sql(text(sql_family_films_num_of_rentals), conn)
     save_bar(df, "category", "num_of_rentals", "Total number of film rentals per family category", OUT/"Q6.png",100, 45)
 
+def family_films_duration_quartiles():
+    sql_family_films_duration_quartiles = """
+    WITH 
+    quartile AS (
+    SELECT f.title,
+            c.name AS category,
+            f.rental_duration,
+            NTILE(4) OVER (ORDER BY f.rental_duration, f.film_id) AS percentile
+    FROM film f
+    JOIN film_category fc
+        ON fc.film_id = f.film_id
+    JOIN category c
+        ON c.category_id = fc.category_id
+    )
 
+    SELECT q.title,
+        q.category,
+        q.rental_duration,
+        q.percentile
+    FROM quartile q
+    WHERE q.category IN ('Animation','Children','Classics','Comedy','Family','Music')
+    """
+    with eng.connect() as conn:
+        df = pd.read_sql(text(sql_family_films_duration_quartiles), conn)
+    categories = sorted(df["category"].dropna().unique().tolist())
+    fig,ax = plt.subplots(figsize=(8,4))
+    for c in categories:
+        x = df.loc[df["category"] == c,'rental_duration'].dropna().to_numpy()
+        if len(x) == 0:
+            continue
+        xs = np.sort(x)
+        ys = np.arange(1, x.size + 1) / x.size
+        ax.plot(xs, ys, label=str(c))
+    ax.set_title("ECDF of rental duration by category")
+    ax.set_xlabel("Rental duration (days)")
+    ax.set_ylabel("Proportion<=x")
+    ax.set_ylabel("rental duration(days)")
+    ax.legend(loc="best", fontsize=8)
+    fig.tight_layout()
+    fig.savefig(OUT/'Q8.png',dpi=160,bbox_inches='tight')
+    plt.close(fig)
 
 def main():
     total_num_of_actors_in_films()
@@ -203,7 +249,7 @@ def main():
     top_actors_per_num_of_films()
     num_of_films_per_length_group()
     num_of_rentals_per_family_categories()
-
+    family_films_duration_quartiles()
 
 main()
 
