@@ -81,88 +81,130 @@ print(df)
 OUT = Path("out/figs")
 OUT.parent.mkdir(parents=True, exist_ok=True)
 
-sql_number_of_actors_in_films = """
-WITH 
-actors_film_info AS (
-	SELECT CONCAT(a.first_name, ' ', a.last_name) AS full_name,
-	       f.title,
-		   f.description,
-		   f.length
-	FROM actor a
-	JOIN film_actor fa
-	  ON a.actor_id = fa.actor_id
-	JOIN film f
-	  ON f.film_id = fa.film_id)
+def total_num_of_actors_in_films():
+    sql_number_of_actors_in_films = """
+    WITH 
+    actors_film_info AS (
+        SELECT CONCAT(a.first_name, ' ', a.last_name) AS full_name,
+            f.title,
+            f.description,
+            f.length
+        FROM actor a
+        JOIN film_actor fa
+        ON a.actor_id = fa.actor_id
+        JOIN film f
+        ON f.film_id = fa.film_id)
 
-SELECT COUNT(*)
-FROM actors_film_info;
-"""
+    SELECT COUNT(*)
+    FROM actors_film_info;
+    """
 
-with eng.connect() as conn:
-    df = pd.read_sql_query(text(sql_number_of_actors_in_films), conn)
-save_kpi(df.iloc[0,0], "Actor-Film rows", OUT/"Q1.png")
-
-
-
-sql_greater60min = """
-WITH
-longer_than_60min AS (
-SELECT CONCAT(a.first_name, ' ', a.last_name) AS full_name,
-       f.title
-FROM film f
-JOIN film_actor fa
-  ON fa.film_id = f.film_id
-JOIN actor a
-  ON a.actor_id = fa.actor_id
-WHERE length>60)
-
-SELECT COUNT(*)
-FROM longer_than_60min;
-"""
-
-with eng.connect() as conn:
-    df = pd.read_sql(text(sql_greater60min), conn)
-save_kpi(int(df.iloc[0,0]), "Films with duration more than 60 min",OUT/"Q2.png")
+    with eng.connect() as conn:
+        df = pd.read_sql_query(text(sql_number_of_actors_in_films), conn)
+    save_kpi(df.iloc[0,0], "Actor-Film rows", OUT/"Q1.png")
 
 
-sql_max_actor = """
-SELECT a.actor_id,
-       CONCAT(a.first_name, ' ', a.last_name) AS full_name,
-	   COUNT(*) AS cnt
-FROM actor a
-JOIN film_actor fa
-  ON a.actor_id = fa.actor_id
-JOIN film f
-  ON f.film_id = fa.film_id
-GROUP BY a.actor_id,full_name
-ORDER BY cnt DESC LIMIT 1;
-"""
+def num_of_films_greater60min():
+    sql_greater60min = """
+    WITH
+    longer_than_60min AS (
+    SELECT CONCAT(a.first_name, ' ', a.last_name) AS full_name,
+        f.title
+    FROM film f
+    JOIN film_actor fa
+    ON fa.film_id = f.film_id
+    JOIN actor a
+    ON a.actor_id = fa.actor_id
+    WHERE length>60)
 
-with eng.connect() as conn:
-    df = pd.read_sql(text(sql_max_actor), conn)
-title = f"Actor with the largest num of films: {df.iloc[0,1]}"
-save_kpi(int(df.iloc[0,2]), title, OUT/"Q3.png")
+    SELECT COUNT(*)
+    FROM longer_than_60min;
+    """
 
-sql_top_ten_actors = sql_max_actor.replace("LIMIT 1", "LIMIT 10")
-with eng.connect() as conn:
-    df = pd.read_sql(text(sql_top_ten_actors), conn)
-save_bar(df,x='full_name', y='cnt',title="Top 10 actors with the largest num of films",outpath=OUT/'Q4.png', rotate_x=45, step=5)
+    with eng.connect() as conn:
+        df = pd.read_sql(text(sql_greater60min), conn)
+    save_kpi(int(df.iloc[0,0]), "Films with duration more than 60 min",OUT/"Q2.png")
+
+def top_actors_per_num_of_films():
+    sql_max_actor = """
+    SELECT a.actor_id,
+        CONCAT(a.first_name, ' ', a.last_name) AS full_name,
+        COUNT(*) AS cnt
+    FROM actor a
+    JOIN film_actor fa
+    ON a.actor_id = fa.actor_id
+    JOIN film f
+    ON f.film_id = fa.film_id
+    GROUP BY a.actor_id,full_name
+    ORDER BY cnt DESC LIMIT 1;
+    """
+
+    with eng.connect() as conn:
+        df = pd.read_sql(text(sql_max_actor), conn)
+    title = f"Actor with the largest num of films: {df.iloc[0,1]}"
+    save_kpi(int(df.iloc[0,2]), title, OUT/"Q3.png")
+
+    sql_top_ten_actors = sql_max_actor.replace("LIMIT 1", "LIMIT 10")
+    with eng.connect() as conn:
+        df = pd.read_sql(text(sql_top_ten_actors), conn)
+    save_bar(df,x='full_name', y='cnt',title="Top 10 actors with the largest num of films",outpath=OUT/'Q4.png', rotate_x=45, step=5)
+
+def num_of_films_per_length_group():
+    sql_filmlen_groups = """
+    SELECT (CASE WHEN f.length<=60 THEN 1 
+                WHEN f.length<=120 THEN 2
+                WHEN f.length<=180 THEN 3
+                ELSE 4 END) AS filmlen_groups,
+            COUNT(*) AS films_in_a_group
+
+    FROM film f
+    GROUP BY filmlen_groups
+    ORDER BY filmlen_groups;
+    """
+    with eng.connect() as conn:
+        df = pd.read_sql(text(sql_filmlen_groups), conn)
+    save_bar(df, x="filmlen_groups", y="films_in_a_group", title="Number of films per length group",outpath=OUT/'Q5.png',step=50)
+
+def num_of_rentals_per_family_categories():
+    sql_family_films_num_of_rentals = """
+    WITH temp AS(
+    SELECT f.title,
+            c.name AS category,
+            COUNT(r.rental_id) AS cnt
+    FROM film f
+    JOIN film_category fc
+    ON f.film_id = fc.film_id
+    JOIN category c
+    ON c.category_id = fc.category_id 
+    AND (c.name = 'Animation' OR c.name = 'Children' OR c.name = 'Classics' OR c.name = 'Comedy' 
+    OR c.name = 'Family' OR c.name = 'Music')
+    LEFT JOIN inventory i
+    ON i.film_id = f.film_id
+    LEFT JOIN rental r
+    ON r.inventory_id = i.inventory_id
+    GROUP BY f.film_id, c.name,f.title
+    ORDER BY category, f.title)
+
+    SELECT category,
+       SUM(cnt) AS num_of_rentals
+    FROM temp
+    GROUP BY category
+    ORDER BY num_of_rentals DESC
+    """
+    with eng.connect() as conn:
+        df = pd.read_sql(text(sql_family_films_num_of_rentals), conn)
+    save_bar(df, "category", "num_of_rentals", "Total number of film rentals per family category", OUT/"Q6.png",100, 45)
 
 
-sql_filmlen_groups = """
-SELECT (CASE WHEN f.length<=60 THEN 1 
-	        WHEN f.length<=120 THEN 2
-			WHEN f.length<=180 THEN 3
-			ELSE 4 END) AS filmlen_groups,
-        COUNT(*) AS films_in_a_group
 
-FROM film f
-GROUP BY filmlen_groups
-ORDER BY filmlen_groups;
-"""
-with eng.connect() as conn:
-    df = pd.read_sql(text(sql_filmlen_groups), conn)
-save_bar(df, x="filmlen_groups", y="films_in_a_group", title="Number of films per length group",outpath=OUT/'Q5.png',step=50)
+def main():
+    total_num_of_actors_in_films()
+    num_of_films_greater60min()
+    top_actors_per_num_of_films()
+    num_of_films_per_length_group()
+    num_of_rentals_per_family_categories()
 
+
+main()
 
 
