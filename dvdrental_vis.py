@@ -240,7 +240,7 @@ def family_films_duration_quartiles():
     ax.set_ylabel("rental duration(days)")
     ax.legend(loc="best", fontsize=8)
     fig.tight_layout()
-    fig.savefig(OUT/'Q8.png',dpi=160,bbox_inches='tight')
+    fig.savefig(OUT/'Q7.png',dpi=160,bbox_inches='tight')
     plt.close(fig)
 
 def main():
