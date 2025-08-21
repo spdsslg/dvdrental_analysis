@@ -64,7 +64,7 @@ def save_heatmap(mat_df, title, outpath):
     outpath = Path(outpath)
     outpath.parent.mkdir(parents=True, exist_ok=True)
     plt.figure(figsize=(8,4.5))
-    plt.imshow(mat_df.values, spect='auto')
+    plt.imshow(mat_df.values, aspect='auto')
     plt.xticks(range(mat_df.shape[1]), [str(c) for c in mat_df.columns], rotation=45, ha='right')
     plt.yticks(range(mat_df.shape[0]), [str(r) for r in mat_df.index])
     plt.title(title)
@@ -205,9 +205,7 @@ def family_films_duration_quartiles():
     sql_family_films_duration_quartiles = """
     WITH 
     quartile AS (
-    SELECT f.title,
-            c.name AS category,
-            f.rental_duration,
+    SELECT c.name AS category,
             NTILE(4) OVER (ORDER BY f.rental_duration, f.film_id) AS percentile
     FROM film f
     JOIN film_category fc
@@ -216,31 +214,65 @@ def family_films_duration_quartiles():
         ON c.category_id = fc.category_id
     )
 
-    SELECT q.title,
-        q.category,
-        q.rental_duration,
-        q.percentile
+    SELECT q.category,
+        q.percentile,
+        COUNT(*) AS cnt
     FROM quartile q
     WHERE q.category IN ('Animation','Children','Classics','Comedy','Family','Music')
+    GROUP BY q.category, q.percentile
+    ORDER BY q.category, q.percentile
     """
     with eng.connect() as conn:
         df = pd.read_sql(text(sql_family_films_duration_quartiles), conn)
-    categories = sorted(df["category"].dropna().unique().tolist())
-    fig,ax = plt.subplots(figsize=(8,4))
-    for c in categories:
-        x = df.loc[df["category"] == c,'rental_duration'].dropna().to_numpy()
-        if len(x) == 0:
-            continue
-        xs = np.sort(x)
-        ys = np.arange(1, x.size + 1) / x.size
-        ax.plot(xs, ys, label=str(c))
-    ax.set_title("ECDF of rental duration by category")
-    ax.set_xlabel("Rental duration (days)")
-    ax.set_ylabel("Proportion<=x")
-    ax.set_ylabel("rental duration(days)")
-    ax.legend(loc="best", fontsize=8)
+
+    fig,axs = plt.subplots(2,2,figsize=(10,6), sharey=True)
+    axs = axs.ravel() #flattening 2D array to simplify looping below
+    for i,q in enumerate([1,2,3,4]):
+        sub = df[df['percentile'] == q]
+        axs[i].bar(sub['category'],sub['cnt'])
+        axs[i].set_title(f"Quartile {q}")
+        axs[i].tick_params(axis='x',labelrotation=45)
+
+    fig.supylabel("Count") #making a general lable, not for each graph, just on the left 
+    fig.supxlabel("Category")#same here but at the bottom
+    fig.suptitle("Family categories x rental-duration quartiles")
     fig.tight_layout()
-    fig.savefig(OUT/'Q7.png',dpi=160,bbox_inches='tight')
+    fig.savefig(OUT/'Q7.png', dpi=160, bbox_inches='tight')
+    plt.close(fig)
+
+def count_rentals_per_month_and_store():
+    sql_count_rentals_per_month_and_store = """
+    SELECT inv.store_id,
+       DATE_TRUNC('month',r.rental_date) AS rental_month,
+	   COUNT(*) AS Count_rentals
+    FROM inventory inv
+    JOIN rental r
+    ON inv.inventory_id = r.inventory_id
+    GROUP BY inv.store_id, DATE_TRUNC('month',r.rental_date)
+    ORDER BY rental_month,inv.store_id 
+    """
+    with eng.connect() as conn:
+        df = pd.read_sql(text(sql_count_rentals_per_month_and_store), conn)
+    df['rental_month'] = pd.to_datetime(df['rental_month'])
+    pivot = df.pivot_table(values='count_rentals', index='rental_month', columns='store_id', aggfunc='sum').fillna(0)
+    fig, ax = plt.subplots(figsize=(10,5))
+    cols = list(pivot.columns)
+    x = np.arange(0,len(pivot.index))
+    n = len(cols)
+    width = 0.8/max(n,1)
+    for i,col in enumerate(cols): #creates a dictionary with key values that correspond to the index of a column
+        ax.bar(x-width+i*width+width/2,pivot[col].values,width, label=f"Store {col}")
+    ax.set_xticks(x) #creates ticks at the corresponding positions of x
+    ax.set_xticklabels(pivot.index.strftime("%Y-%m"), rotation=45, ha='center')#naming those ticks that we created
+
+    ax.set_title("Monthly rentals per store")
+    ax.set_xlabel("Month")
+    ax.set_ylabel("Rentals count")
+    ax.legend(loc='best',fontsize=8)
+    ax.grid(axis="y", linestyle=":") #creates horizontal dotted lines
+
+    fig.tight_layout()
+    fig.savefig(OUT/'Q8.png', dpi=160, bbox_inches='tight')
     plt.close(fig)
 
 def main():
@@ -250,6 +282,7 @@ def main():
     num_of_films_per_length_group()
     num_of_rentals_per_family_categories()
     family_films_duration_quartiles()
+    count_rentals_per_month_and_store()
 
 main()
 
