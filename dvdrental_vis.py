@@ -295,6 +295,46 @@ def count_rentals_per_month_and_store():
     fig.savefig(OUT/'Q8.png', dpi=160, bbox_inches='tight')
     plt.close(fig)
 
+def top10customers_payment_total_per_month():
+    sql_top10customers_payment_total_per_month = """
+    WITH top_ten AS (
+    SELECT c.customer_id,
+            CONCAT(c.first_name,' ',c.last_name) AS full_name,
+            SUM(p.amount) AS total
+    FROM customer c
+    JOIN payment p ON p.customer_id = c.customer_id
+    GROUP BY c.customer_id, full_name
+    ORDER BY total DESC
+    LIMIT 10
+    )
+    SELECT DATE_TRUNC('month', p.payment_date)::date AS pay_mon,
+        tt.full_name,
+        COUNT(*) AS pay_countpermon,
+        SUM(p.amount) AS pay_amount
+    FROM top_ten tt
+    JOIN payment p ON p.customer_id = tt.customer_id
+    WHERE p.payment_date >= '2007-01-01'
+    AND p.payment_date <  '2008-01-01'
+    GROUP BY tt.customer_id, tt.full_name, pay_mon
+    ORDER BY full_name, pay_mon;
+    """
+    with eng.connect() as conn:
+        df = pd.read_sql(text(sql_top10customers_payment_total_per_month), conn)
+    
+    df["pay_mon"] = pd.to_datetime(df["pay_mon"])
+
+    months = pd.date_range('2007-01-01','2007-12-31', freq='MS')#creating an aray of months
+    amt = df.pivot_table(index='pay_mon', columns='full_name', values='pay_amount', aggfunc='sum').reindex(months).fillna(0)
+
+    cnt = df.pivot_table(index='pay_mon', columns='full_name', values='pay_countpermon').reindex(months).fillna(0)
+
+    order = amt.sum().sort_values(ascending=False).index.tolist()#calculates the total sum of each customer pay_amount and sorts in desc order
+    amt = amt.reindex(columns = order)
+    cnt = cnt.reindex(columns = order)
+    
+    plot_stacked_monthly(amt, title="Top 10 customers' monthly payment amount in 2007", ylabel='Payment amount', outpath=OUT/'Q9.png')
+    plot_stacked_monthly(cnt, title="Top 10 customers' monthly count of payments in 2007",ylabel='Number of payments', outpath=OUT/'Q10.png')
+
 
 def main():
     total_num_of_actors_in_films()
@@ -304,7 +344,7 @@ def main():
     num_of_rentals_per_family_categories()
     family_films_duration_quartiles()
     count_rentals_per_month_and_store()
-    
+    top10customers_payment_total_per_month()
 
 main()
 
