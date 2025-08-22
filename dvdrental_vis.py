@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sqlalchemy import create_engine, text
 import numpy as np
+import matplotlib.ticker as mticker
 
 #this function establishes the way we will talk with the db
 def get_engine():
@@ -74,11 +75,30 @@ def save_heatmap(mat_df, title, outpath):
     plt.close()
 
 
-def ecdf(x):
-    x = np.sort(np.asarray(x))
-    y = np.arange(1,len(x)+1)/len(x)
-    return x,y
+def plot_stacked_monthly(df, title, ylabel, outpath):
+    x = np.arange(len(df.index))
+    bottoms = np.zeros(len(x))
+    fig, ax = plt.subplots(figsize=(11,4.8))
 
+    handles =[]
+    for col in df.columns:
+        bars = ax.bar(x,df[col].values,bottom=bottoms,label=str(col))#this creates a subbar for customer col for each month
+        handles.append(bars[0])#we will pass this to the legend later, so we save first values of each instance of customer subbar
+        bottoms += df[col].values #regulates the beginning position of the next subbar in each column
+    
+    ax.set_xticks(x)
+    ax.set_xticklabels([d.strftime("%Y-%m") for d in df.index],rotation=45, ha='center')
+
+    ax.set_title(title)
+    ax.set_xlabel("Month")
+    ax.set_ylabel(ylabel)
+    ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=6, integer=False))
+
+    ax.legend(handles=handles, labels=[str(c) for c in df.columns])
+
+    fig.tight_layout()
+    fig.savefig(outpath, dpi=160,bbox_inches='tight')
+    plt.close(fig)
 
 with eng.connect() as conn:
     df = pd.read_sql_query(text("SELECT 1 AS ok"), conn)
@@ -233,9 +253,9 @@ def family_films_duration_quartiles():
         axs[i].set_title(f"Quartile {q}")
         axs[i].tick_params(axis='x',labelrotation=45)
 
-    fig.supylabel("Count") #making a general lable, not for each graph, just on the left 
-    fig.supxlabel("Category")#same here but at the bottom
-    fig.suptitle("Family categories x rental-duration quartiles")
+    fig.supylabel("Number of films rented") #making a general lable, not for each graph, just on the left 
+    
+    fig.suptitle("Number of family films rented per each quartile of rental duration")
     fig.tight_layout()
     fig.savefig(OUT/'Q7.png', dpi=160, bbox_inches='tight')
     plt.close(fig)
@@ -275,6 +295,7 @@ def count_rentals_per_month_and_store():
     fig.savefig(OUT/'Q8.png', dpi=160, bbox_inches='tight')
     plt.close(fig)
 
+
 def main():
     total_num_of_actors_in_films()
     num_of_films_greater60min()
@@ -283,6 +304,7 @@ def main():
     num_of_rentals_per_family_categories()
     family_films_duration_quartiles()
     count_rentals_per_month_and_store()
+    
 
 main()
 
