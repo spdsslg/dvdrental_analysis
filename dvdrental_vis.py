@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from sqlalchemy import create_engine, text
 import numpy as np
 import matplotlib.ticker as mticker
+import matplotlib.dates as mdates
 
 #this function establishes the way we will talk with the db
 def get_engine():
@@ -336,6 +337,69 @@ def top10customers_payment_total_per_month():
     plot_stacked_monthly(cnt, title="Top 10 customers' monthly count of payments in 2007",ylabel='Number of payments', outpath=OUT/'Q10.png')
 
 
+def difference_across_monthly_payments():
+    sql_difference_across_monthly_payments = """
+    WITH 
+    top_ten AS (
+        SELECT c.customer_id,
+            CONCAT(c.first_name, ' ', c.last_name) AS full_name,
+            SUM(amount) AS total
+        FROM customer c
+        JOIN payment p
+        ON p.customer_id = c.customer_id
+        GROUP BY c.customer_id, full_name
+        ORDER BY total DESC LIMIT 10
+    ),
+    rent_info_top_10 AS (
+        SELECT DATE_TRUNC('month',p.payment_date) AS pay_mon,
+            tt.full_name,
+            SUM(p.amount) AS pay_amount
+        FROM  top_ten tt
+        JOIN payment p
+        ON p.customer_id = tt.customer_id
+        WHERE p.payment_date >= '2007-01-01' AND p.payment_date<'2008-01-01'
+        GROUP BY tt.customer_id, tt.full_name, pay_mon
+        ORDER BY full_name,pay_mon
+    )
+
+    SELECT pay_mon,
+        full_name,
+        pay_amount,
+        LAG(pay_amount,1,0) OVER (PARTITION BY full_name ORDER BY pay_mon) AS prev_month_pay,
+        pay_amount - LAG(pay_amount,1,0) OVER (PARTITION BY full_name ORDER BY pay_mon) AS monthly_diff_lag
+    FROM rent_info_top_10
+    """
+
+    with eng.connect() as conn:
+        df = pd.read_sql_query(text(sql_difference_across_monthly_payments), conn)
+    
+    df['pay_mon'] = pd.to_datetime(df['pay_mon'])
+    pivot = df.pivot_table(index='pay_mon', columns='full_name', values='monthly_diff_lag', aggfunc='sum').sort_index()
+
+    idx=pd.date_range(pivot.index.min(), pivot.index.max(), freq='MS')
+    pivot = pivot.reindex(idx)
+
+    fig,ax = plt.subplots(figsize=(11,5))
+    for col in pivot.columns:
+        ax.plot(pivot.index, pivot[col], label=str(col))
+    
+    ax.axhline(0, linewidth=1, linestyle='--')#baseline at 0 to see negative changes
+
+    ax.xaxis.set_major_locator(mdates.MonthLocator())
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+    fig.autofmt_xdate()
+
+    ax.set_title("Monthly change in payment amount vs previous month for Top 10 customers by amount payed")
+    ax.set_xlabel("Month")
+    ax.set_ylabel("payment amount difference between this and previous months")
+    ax.legend(loc='center left', bbox_to_anchor=(1.01, 0.5), fontsize=8)
+    ax.grid(axis='y', linestyle=':')
+
+    fig.tight_layout(rect=[0, 0, 0.88, 1])
+    fig.savefig(OUT / "Q11.png", dpi=160, bbox_inches="tight")
+    plt.close(fig)
+
+
 def main():
     total_num_of_actors_in_films()
     num_of_films_greater60min()
@@ -345,6 +409,7 @@ def main():
     family_films_duration_quartiles()
     count_rentals_per_month_and_store()
     top10customers_payment_total_per_month()
+    difference_across_monthly_payments()
 
 main()
 
