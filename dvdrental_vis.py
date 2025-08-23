@@ -551,8 +551,8 @@ def top10customers_payment_total_per_month():
     amt = amt.reindex(columns = order)
     cnt = cnt.reindex(columns = order)
     
-    plot_stacked_monthly(amt, title="Top 10 customers' monthly payment amount in 2007", ylabel='Payment amount', outpath=OUT/'Q9.png')
-    plot_stacked_monthly(cnt, title="Top 10 customers' monthly count of payments in 2007",ylabel='Number of payments', outpath=OUT/'Q10.png')
+    plot_stacked_monthly(amt, title="Top 10 customers'(by total amount payed) monthly payment amount in 2007", ylabel='Payment amount', outpath=OUT/'Q9.png')
+    plot_stacked_monthly(cnt, title="Top 10 customers'(by total amount payed) monthly count of payments in 2007",ylabel='Number of payments', outpath=OUT/'Q10.png')
 
 
 def difference_across_monthly_payments():
@@ -632,7 +632,7 @@ def difference_across_monthly_payments():
 
     ax.set_title("Monthly change in payment amount vs previous month for Top 10 customers by amount payed")
     ax.set_xlabel("Month")
-    ax.set_ylabel("payment amount difference between this and previous months")
+    ax.set_ylabel("Month payment amount difference")
     ax.legend(loc='center left', bbox_to_anchor=(1.01, 0.5), fontsize=8)
     ax.grid(axis='y', linestyle=':')
 
