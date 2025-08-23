@@ -8,3 +8,5 @@
 *.swp
 *.vscode/
 
+.env
+

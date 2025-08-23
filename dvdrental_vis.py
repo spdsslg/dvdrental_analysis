@@ -9,6 +9,33 @@ import matplotlib.dates as mdates
 
 #this function establishes the way we will talk with the db
 def get_engine():
+    """
+    Create a SQLAlchemy Engine for PostgreSQL.
+
+    If `db_url` is provided, it is used directly. Otherwise, the connection URL is
+    built from environment variables PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE,
+    falling back to sensible defaults.
+
+    Parameters
+    ----------
+    db_url : str or None, optional
+        Full SQLAlchemy URL like
+        ``postgresql+psycopg2://user:pass@host:port/db``.
+        If provided, environment variables are ignored.
+    driver : {"psycopg2", "psycopg"}, optional
+        PostgreSQL DBAPI driver to use. Default is "psycopg2".
+
+    Returns
+    -------
+    sqlalchemy.engine.Engine
+        A live Engine you can `.connect()` with.
+
+    Raises
+    ------
+    sqlalchemy.exc.NoSuchModuleError
+        If the requested driver is not installed.
+    """
+
     host = os.getenv("PGHOST", "localhost")
     port = os.getenv("PGPORT", "5432")
     user = os.getenv("PGUSER", "postgres")
@@ -20,6 +47,19 @@ eng = get_engine() #establishing engine
 
 #this function creates a kpi figure and saves it to the outpath 
 def save_kpi(value, title, outpath): 
+    """
+    Render a simple KPI card (big number + subtitle) and save it as a PNG.
+
+    Parameters
+    ----------
+    value : int | float | array-like of length 1
+        Number to display. Arrays/Series/DataFrames must contain a single value.
+    title : str
+        Subtitle shown under the big number.
+    outpath : str | pathlib.Path
+        Destination file path. Parent folders are created if missing.
+    """
+
     outpath = Path(outpath)
     outpath.parent.mkdir(parents=True, exist_ok=True) #creates directory if not exists
     plt.figure(figsize=(6,3.5)) #creates the canvas 
@@ -31,6 +71,39 @@ def save_kpi(value, title, outpath):
     plt.close()
 
 def save_bar(df,x, y, title, outpath, step,rotate_x=0):
+    """
+    Render a vertical bar chart from a DataFrame and save it as a PNG.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Source table containing columns `x` and `y`.
+    x : str
+        Column name to use for category labels on the x-axis. Coerced to string.
+    y : str
+        Column name with numeric bar heights.
+    title : str
+        Plot title.
+    outpath : str or pathlib.Path
+        Destination file path. Parent directories are created if missing.
+    step : int or float
+        Spacing between major y-axis ticks (e.g., 5 gives 0,5,10,...).
+    rotate_x : int, optional
+        Degrees to rotate x tick labels (e.g., 45). Default is 0.
+
+    Returns
+    -------
+    None
+        Saves the figure to `outpath`.
+
+    Raises
+    ------
+    KeyError
+        If `x` or `y` is not a column in `df`.
+    ValueError
+        If `step <= 0` or if `y` cannot be interpreted as numeric.
+    """
+
     outpath = Path(outpath)
     outpath.parent.mkdir(parents=True, exist_ok=True)
     plt.figure(figsize=(4,3.5))
@@ -49,6 +122,27 @@ def save_bar(df,x, y, title, outpath, step,rotate_x=0):
     plt.close()
 
 def save_line(pivot_df, outpath, title):
+    """
+    Plot a multi-line chart (one line per column) and save it as a PNG.
+
+    Parameters
+    ----------
+    pivot_df : pandas.DataFrame
+        Wide table where the index provides x-values (e.g., months) and each
+        column is a separate series to plot as a line. Missing values are
+        allowed; Matplotlib will gap the line at NaNs.
+    outpath : str or pathlib.Path
+        Destination file path for the PNG. Parent directories are created
+        if they do not exist.
+    title : str
+        Plot title shown at the top.
+
+    Returns
+    -------
+    None
+        Writes the figure to `outpath`.
+    """
+
     outpath = Path(outpath)
     outpath.parent.mkdir(parents=True, exist_ok=True)
     plt.figure(figsize=(9,4))
@@ -63,6 +157,19 @@ def save_line(pivot_df, outpath, title):
     plt.close()
 
 def save_heatmap(mat_df, title, outpath):
+    """
+    Draw a heatmap from a 2D numeric DataFrame and save as a PNG.
+
+    Parameters
+    ----------
+    mat_df : pandas.DataFrame
+        2D table of numeric values. Index supplies y tick labels; columns supply x tick labels.
+    title : str
+        Plot title.
+    outpath : str | pathlib.Path
+        Destination path. Parent folders are created.
+    """
+
     outpath = Path(outpath)
     outpath.parent.mkdir(parents=True, exist_ok=True)
     plt.figure(figsize=(8,4.5))
@@ -77,6 +184,28 @@ def save_heatmap(mat_df, title, outpath):
 
 
 def plot_stacked_monthly(df, title, ylabel, outpath):
+    """
+    Plot a stacked monthly column chart and save it as a PNG.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Wide table where rows are months (DatetimeIndex or strings) and columns are
+        series to stack (e.g., customer names). Values must be numeric (>= 0 makes
+        stacking interpretable).
+    title : str
+        Figure title.
+    ylabel : str
+        Y-axis label.
+    outpath : str or pathlib.Path
+        Destination PNG path. Parent directories must exist (or be creatable).
+
+    Returns
+    -------
+    None
+        Writes the figure to `outpath`.
+    """
+    
     x = np.arange(len(df.index))
     bottoms = np.zeros(len(x))
     fig, ax = plt.subplots(figsize=(11,4.8))
@@ -105,10 +234,12 @@ with eng.connect() as conn:
     df = pd.read_sql_query(text("SELECT 1 AS ok"), conn)
 print(df)
 
-OUT = Path("out/figs")
+OUT = Path("out")
 OUT.parent.mkdir(parents=True, exist_ok=True)
 
 def total_num_of_actors_in_films():
+    """Finds the total number of actors that participated in films"""
+
     sql_number_of_actors_in_films = """
     WITH 
     actors_film_info AS (
@@ -132,6 +263,8 @@ def total_num_of_actors_in_films():
 
 
 def num_of_films_greater60min():
+    """Finds the number of films that are greater than 60 minutes and saves to KPI"""
+
     sql_greater60min = """
     WITH
     longer_than_60min AS (
@@ -153,6 +286,10 @@ def num_of_films_greater60min():
     save_kpi(int(df.iloc[0,0]), "Films with duration more than 60 min",OUT/"Q2.png")
 
 def top_actors_per_num_of_films():
+    """
+    Find the most prolific actor and the top-10 by film count; save a KPI and a bar chart.
+    """
+
     sql_max_actor = """
     SELECT a.actor_id,
         CONCAT(a.first_name, ' ', a.last_name) AS full_name,
@@ -177,6 +314,10 @@ def top_actors_per_num_of_films():
     save_bar(df,x='full_name', y='cnt',title="Top 10 actors with the largest num of films",outpath=OUT/'Q4.png', rotate_x=45, step=5)
 
 def num_of_films_per_length_group():
+    """
+    Count films by runtime bucket (≤60, 61–120, 121–180, >180 minutes) and save a bar chart.
+    """
+
     sql_filmlen_groups = """
     SELECT (CASE WHEN f.length<=60 THEN 1 
                 WHEN f.length<=120 THEN 2
@@ -193,6 +334,28 @@ def num_of_films_per_length_group():
     save_bar(df, x="filmlen_groups", y="films_in_a_group", title="Number of films per length group",outpath=OUT/'Q5.png',step=50)
 
 def num_of_rentals_per_family_categories():
+    """
+    Plot total rental events per family film category and save as a PNG.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    None
+        Writes the figure to disk.
+
+    Raises
+    ------
+    sqlalchemy.exc.SQLAlchemyError
+        If the SQL query or connection fails.
+    KeyError
+        If expected columns are missing from the result.
+    ValueError
+        If the result is empty and cannot be plotted."""
+
+
     sql_family_films_num_of_rentals = """
     WITH temp AS(
     SELECT f.title,
@@ -223,6 +386,25 @@ def num_of_rentals_per_family_categories():
     save_bar(df, "category", "num_of_rentals", "Total number of film rentals per family category", OUT/"Q6.png",100, 45)
 
 def family_films_duration_quartiles():
+    """
+    Visualize family categories across rental-duration quartiles (Q1–Q4) and save as PNG.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    None
+        Writes the figure to disk.
+
+    Notes
+    -----
+    This counts **films** per category/quartile based on `film.rental_duration`. It does
+    not count rental events. To visualize rentals instead, join through `inventory` and
+    `rental` and aggregate on those tables.
+    """
+
     sql_family_films_duration_quartiles = """
     WITH 
     quartile AS (
@@ -262,6 +444,28 @@ def family_films_duration_quartiles():
     plt.close(fig)
 
 def count_rentals_per_month_and_store():
+    """
+    Draws a grouped bar chart of monthly rental counts per store and save as a PNG.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    None
+        Writes the figure to disk.
+
+    Raises
+    ------
+    sqlalchemy.exc.SQLAlchemyError
+        If the SQL query or connection fails.
+    KeyError
+        If expected columns are missing from the query result.
+    ValueError
+        If the result is empty and cannot be plotted."""
+
+
     sql_count_rentals_per_month_and_store = """
     SELECT inv.store_id,
        DATE_TRUNC('month',r.rental_date) AS rental_month,
@@ -297,6 +501,20 @@ def count_rentals_per_month_and_store():
     plt.close(fig)
 
 def top10customers_payment_total_per_month():
+    """
+    Computes top 10 customers by total payments, then summarize monthly amount and count.
+
+    Returns
+    -------
+    None
+        Saves figures into the `OUT` directory.
+
+    Notes
+    -----
+    - If some months have no data, reindexing to a full month index ensures 0-valued rows so
+      the charts show complete calendars.
+    """
+
     sql_top10customers_payment_total_per_month = """
     WITH top_ten AS (
     SELECT c.customer_id,
@@ -338,6 +556,29 @@ def top10customers_payment_total_per_month():
 
 
 def difference_across_monthly_payments():
+    """
+    Plots month-over-month payment changes for the top 10 customers (year 2007) and save as PNG.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    None
+        Writes the figure to disk.
+
+    Raises
+    ------
+    sqlalchemy.exc.SQLAlchemyError
+        If the database query fails or the connection cannot be established.
+    KeyError
+        If expected columns are missing from the query result.
+    ValueError
+        If the resulting DataFrame is empty after querying/pivoting.
+    """
+
+
     sql_difference_across_monthly_payments = """
     WITH 
     top_ten AS (
