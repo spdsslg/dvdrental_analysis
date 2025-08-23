@@ -6,6 +6,17 @@ from sqlalchemy import create_engine, text
 import numpy as np
 import matplotlib.ticker as mticker
 import matplotlib.dates as mdates
+from functools import lru_cache
+
+QUERIES_DIR=Path(__file__).resolve().parent/"queries"
+
+@lru_cache(maxsize=None)
+def load_sql(filename: str)->str:
+    """
+    Read a .sql file from queries folder
+    """
+    path = QUERIES_DIR/filename
+    return path.read_text(encoding='utf-8')
 
 #this function establishes the way we will talk with the db
 def get_engine():
@@ -233,6 +244,7 @@ def plot_stacked_monthly(df, title, ylabel, outpath):
 with eng.connect() as conn:
     df = pd.read_sql_query(text("SELECT 1 AS ok"), conn)
 print(df)
+print("connection is successful")
 
 OUT = Path("out")
 OUT.parent.mkdir(parents=True, exist_ok=True)
@@ -240,22 +252,7 @@ OUT.parent.mkdir(parents=True, exist_ok=True)
 def total_num_of_actors_in_films():
     """Finds the total number of actors that participated in films"""
 
-    sql_number_of_actors_in_films = """
-    WITH 
-    actors_film_info AS (
-        SELECT CONCAT(a.first_name, ' ', a.last_name) AS full_name,
-            f.title,
-            f.description,
-            f.length
-        FROM actor a
-        JOIN film_actor fa
-        ON a.actor_id = fa.actor_id
-        JOIN film f
-        ON f.film_id = fa.film_id)
-
-    SELECT COUNT(*)
-    FROM actors_film_info;
-    """
+    sql_number_of_actors_in_films = load_sql('q1.sql')
 
     with eng.connect() as conn:
         df = pd.read_sql_query(text(sql_number_of_actors_in_films), conn)
@@ -265,21 +262,7 @@ def total_num_of_actors_in_films():
 def num_of_films_greater60min():
     """Finds the number of films that are greater than 60 minutes and saves to KPI"""
 
-    sql_greater60min = """
-    WITH
-    longer_than_60min AS (
-    SELECT CONCAT(a.first_name, ' ', a.last_name) AS full_name,
-        f.title
-    FROM film f
-    JOIN film_actor fa
-    ON fa.film_id = f.film_id
-    JOIN actor a
-    ON a.actor_id = fa.actor_id
-    WHERE length>60)
-
-    SELECT COUNT(*)
-    FROM longer_than_60min;
-    """
+    sql_greater60min = load_sql('q2.sql')
 
     with eng.connect() as conn:
         df = pd.read_sql(text(sql_greater60min), conn)
@@ -290,18 +273,7 @@ def top_actors_per_num_of_films():
     Find the most prolific actor and the top-10 by film count; save a KPI and a bar chart.
     """
 
-    sql_max_actor = """
-    SELECT a.actor_id,
-        CONCAT(a.first_name, ' ', a.last_name) AS full_name,
-        COUNT(*) AS cnt
-    FROM actor a
-    JOIN film_actor fa
-    ON a.actor_id = fa.actor_id
-    JOIN film f
-    ON f.film_id = fa.film_id
-    GROUP BY a.actor_id,full_name
-    ORDER BY cnt DESC LIMIT 1;
-    """
+    sql_max_actor = load_sql('q3.sql')
 
     with eng.connect() as conn:
         df = pd.read_sql(text(sql_max_actor), conn)
@@ -318,17 +290,7 @@ def num_of_films_per_length_group():
     Count films by runtime bucket (≤60, 61–120, 121–180, >180 minutes) and save a bar chart.
     """
 
-    sql_filmlen_groups = """
-    SELECT (CASE WHEN f.length<=60 THEN 1 
-                WHEN f.length<=120 THEN 2
-                WHEN f.length<=180 THEN 3
-                ELSE 4 END) AS filmlen_groups,
-            COUNT(*) AS films_in_a_group
-
-    FROM film f
-    GROUP BY filmlen_groups
-    ORDER BY filmlen_groups;
-    """
+    sql_filmlen_groups = load_sql('q4.sql')
     with eng.connect() as conn:
         df = pd.read_sql(text(sql_filmlen_groups), conn)
     save_bar(df, x="filmlen_groups", y="films_in_a_group", title="Number of films per length group",outpath=OUT/'Q5.png',step=50)
@@ -356,31 +318,7 @@ def num_of_rentals_per_family_categories():
         If the result is empty and cannot be plotted."""
 
 
-    sql_family_films_num_of_rentals = """
-    WITH temp AS(
-    SELECT f.title,
-            c.name AS category,
-            COUNT(r.rental_id) AS cnt
-    FROM film f
-    JOIN film_category fc
-    ON f.film_id = fc.film_id
-    JOIN category c
-    ON c.category_id = fc.category_id 
-    AND (c.name = 'Animation' OR c.name = 'Children' OR c.name = 'Classics' OR c.name = 'Comedy' 
-    OR c.name = 'Family' OR c.name = 'Music')
-    LEFT JOIN inventory i
-    ON i.film_id = f.film_id
-    LEFT JOIN rental r
-    ON r.inventory_id = i.inventory_id
-    GROUP BY f.film_id, c.name,f.title
-    ORDER BY category, f.title)
-
-    SELECT category,
-       SUM(cnt) AS num_of_rentals
-    FROM temp
-    GROUP BY category
-    ORDER BY num_of_rentals DESC
-    """
+    sql_family_films_num_of_rentals = load_sql('q5.sql')
     with eng.connect() as conn:
         df = pd.read_sql(text(sql_family_films_num_of_rentals), conn)
     save_bar(df, "category", "num_of_rentals", "Total number of film rentals per family category", OUT/"Q6.png",100, 45)
@@ -405,26 +343,7 @@ def family_films_duration_quartiles():
     `rental` and aggregate on those tables.
     """
 
-    sql_family_films_duration_quartiles = """
-    WITH 
-    quartile AS (
-    SELECT c.name AS category,
-            NTILE(4) OVER (ORDER BY f.rental_duration, f.film_id) AS percentile
-    FROM film f
-    JOIN film_category fc
-        ON fc.film_id = f.film_id
-    JOIN category c
-        ON c.category_id = fc.category_id
-    )
-
-    SELECT q.category,
-        q.percentile,
-        COUNT(*) AS cnt
-    FROM quartile q
-    WHERE q.category IN ('Animation','Children','Classics','Comedy','Family','Music')
-    GROUP BY q.category, q.percentile
-    ORDER BY q.category, q.percentile
-    """
+    sql_family_films_duration_quartiles = load_sql('q6.sql')
     with eng.connect() as conn:
         df = pd.read_sql(text(sql_family_films_duration_quartiles), conn)
 
@@ -466,16 +385,8 @@ def count_rentals_per_month_and_store():
         If the result is empty and cannot be plotted."""
 
 
-    sql_count_rentals_per_month_and_store = """
-    SELECT inv.store_id,
-       DATE_TRUNC('month',r.rental_date) AS rental_month,
-	   COUNT(*) AS Count_rentals
-    FROM inventory inv
-    JOIN rental r
-    ON inv.inventory_id = r.inventory_id
-    GROUP BY inv.store_id, DATE_TRUNC('month',r.rental_date)
-    ORDER BY rental_month,inv.store_id 
-    """
+    sql_count_rentals_per_month_and_store = load_sql('q7.sql')
+
     with eng.connect() as conn:
         df = pd.read_sql(text(sql_count_rentals_per_month_and_store), conn)
     df['rental_month'] = pd.to_datetime(df['rental_month'])
@@ -515,28 +426,7 @@ def top10customers_payment_total_per_month():
       the charts show complete calendars.
     """
 
-    sql_top10customers_payment_total_per_month = """
-    WITH top_ten AS (
-    SELECT c.customer_id,
-            CONCAT(c.first_name,' ',c.last_name) AS full_name,
-            SUM(p.amount) AS total
-    FROM customer c
-    JOIN payment p ON p.customer_id = c.customer_id
-    GROUP BY c.customer_id, full_name
-    ORDER BY total DESC
-    LIMIT 10
-    )
-    SELECT DATE_TRUNC('month', p.payment_date)::date AS pay_mon,
-        tt.full_name,
-        COUNT(*) AS pay_countpermon,
-        SUM(p.amount) AS pay_amount
-    FROM top_ten tt
-    JOIN payment p ON p.customer_id = tt.customer_id
-    WHERE p.payment_date >= '2007-01-01'
-    AND p.payment_date <  '2008-01-01'
-    GROUP BY tt.customer_id, tt.full_name, pay_mon
-    ORDER BY full_name, pay_mon;
-    """
+    sql_top10customers_payment_total_per_month = load_sql('q8.sql')
     with eng.connect() as conn:
         df = pd.read_sql(text(sql_top10customers_payment_total_per_month), conn)
     
@@ -579,37 +469,7 @@ def difference_across_monthly_payments():
     """
 
 
-    sql_difference_across_monthly_payments = """
-    WITH 
-    top_ten AS (
-        SELECT c.customer_id,
-            CONCAT(c.first_name, ' ', c.last_name) AS full_name,
-            SUM(amount) AS total
-        FROM customer c
-        JOIN payment p
-        ON p.customer_id = c.customer_id
-        GROUP BY c.customer_id, full_name
-        ORDER BY total DESC LIMIT 10
-    ),
-    rent_info_top_10 AS (
-        SELECT DATE_TRUNC('month',p.payment_date) AS pay_mon,
-            tt.full_name,
-            SUM(p.amount) AS pay_amount
-        FROM  top_ten tt
-        JOIN payment p
-        ON p.customer_id = tt.customer_id
-        WHERE p.payment_date >= '2007-01-01' AND p.payment_date<'2008-01-01'
-        GROUP BY tt.customer_id, tt.full_name, pay_mon
-        ORDER BY full_name,pay_mon
-    )
-
-    SELECT pay_mon,
-        full_name,
-        pay_amount,
-        LAG(pay_amount,1,0) OVER (PARTITION BY full_name ORDER BY pay_mon) AS prev_month_pay,
-        pay_amount - LAG(pay_amount,1,0) OVER (PARTITION BY full_name ORDER BY pay_mon) AS monthly_diff_lag
-    FROM rent_info_top_10
-    """
+    sql_difference_across_monthly_payments = load_sql('q9.sql')
 
     with eng.connect() as conn:
         df = pd.read_sql_query(text(sql_difference_across_monthly_payments), conn)
