@@ -7,52 +7,7 @@ import numpy as np
 import matplotlib.ticker as mticker
 import matplotlib.dates as mdates
 from functools import lru_cache
-
-QUERIES_DIR=Path(__file__).resolve().parent/"queries"
-
-@lru_cache(maxsize=None)
-def load_sql(filename: str)->str:
-    """
-    Read a .sql file from queries folder
-    """
-    path = QUERIES_DIR/filename
-    return path.read_text(encoding='utf-8')
-
-#this function establishes the way we will talk with the db
-def get_engine():
-    """
-    Create a SQLAlchemy Engine for PostgreSQL.
-
-    If `db_url` is provided, it is used directly. Otherwise, the connection URL is
-    built from environment variables PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE,
-    falling back to sensible defaults.
-
-    Parameters
-    ----------
-    db_url : str or None, optional
-        Full SQLAlchemy URL like
-        ``postgresql+psycopg2://user:pass@host:port/db``.
-        If provided, environment variables are ignored.
-    driver : {"psycopg2", "psycopg"}, optional
-        PostgreSQL DBAPI driver to use. Default is "psycopg2".
-
-    Returns
-    -------
-    sqlalchemy.engine.Engine
-        A live Engine you can `.connect()` with.
-
-    Raises
-    ------
-    sqlalchemy.exc.NoSuchModuleError
-        If the requested driver is not installed.
-    """
-
-    host = os.getenv("PGHOST", "localhost")
-    port = os.getenv("PGPORT", "5432")
-    user = os.getenv("PGUSER", "postgres")
-    passw = os.getenv("PGPASSWORD", "postgres")
-    db = os.getenv("PGDATABASE", "dvdrental")
-    return create_engine(f"postgresql+psycopg2://{user}:{passw}@{host}:{port}/{db}")
+from packages import *
 
 eng = get_engine() #establishing engine
 
@@ -246,8 +201,6 @@ with eng.connect() as conn:
 print(df)
 print("connection is successful")
 
-OUT = Path("out")
-OUT.parent.mkdir(parents=True, exist_ok=True)
 
 def total_num_of_actors_in_films():
     """Finds the total number of actors that participated in films"""
@@ -512,6 +465,7 @@ def main():
     top10customers_payment_total_per_month()
     difference_across_monthly_payments()
 
-main()
+if __name__=='__main__':
+    main()
 
 
