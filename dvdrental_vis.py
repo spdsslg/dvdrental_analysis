@@ -9,7 +9,24 @@ import matplotlib.dates as mdates
 from functools import lru_cache
 from packages import *
 
+def _assert_dvdrental_loaded(engine):
+    with engine.connect() as conn:
+        ok = conn.execute(text("""
+            SELECT EXISTS (
+              SELECT 1
+              FROM information_schema.tables
+              WHERE table_schema='public' AND table_name='film'
+            )
+        """)).scalar()
+    if not ok:
+        raise SystemExit(
+            "dvdrental not loaded yet (missing table 'film'). "
+            "Put dvdrental.tar into initdb/ and re-run the DB, or restore manually. "
+            "Skipping plots."
+        )
+
 eng = get_engine() #establishing engine
+_assert_dvdrental_loaded(eng)
 
 #this function creates a kpi figure and saves it to the outpath 
 def save_kpi(value, title, outpath): 
