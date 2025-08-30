@@ -29,29 +29,37 @@ Plots are written to `app/OUT/`.
 ## Project structure
 
 dvdrental_visualisation/
-├─ docker-compose.yml
+├─ docker-compose.yml                     # Compose file (postgres, optional app)
 ├─ initdb/
-│  ├─ dvdrental.tar      # dataset dump (pg_dump custom format)
-│  └─ load.sh            # auto-restore on first DB init
+│  ├─ dvdrental.tar                       # Dataset dump (pg_dump custom format)
+│  └─ load.sh                             # Auto-restore dvdrental.tar on first DB init
 └─ app/
    ├─ Dockerfile
-   ├─ requirements.txt   # pandas, matplotlib, SQLAlchemy>=2.0, psycopg2-binary, python-dotenv
-   ├─ dvdrental_vis.py   # orchestrates analyses & saves plots
-   ├─ db.py  paths.py  sql.py
-   ├─ queries/           # SQL files used by the plots
-   └─ OUT/               # generated charts
-
+   ├─ requirements.txt                    # pandas, matplotlib, SQLAlchemy>=2.0, psycopg2-binary, python-dotenv
+   ├─ dvdrental_vis.py                    # Main script: orchestrates analyses & saves plots
+   ├─ db.py                               # Engine factory using env vars (os.getenv)
+   ├─ paths.py                            # Paths/constants (e.g., QUERIES_DIR, OUT)
+   ├─ sql.py                              # load_sql() helper
+   ├─ queries/
+   │  ├─ count_rentals_per_month_and_store.sql
+   │  ├─ difference_across_monthly_payments.sql
+   │  ├─ family_films_duration_quartiles.sql
+   │  ├─ num_of_films_per_length_group.sql
+   │  └─ top_actors_per_num_of_films.sql
+   └─ OUT/                             
 ---
 
 ## Run locally (Python)
 
 Prereqs: Python 3.11+
 
-1) (Optional) create a virtualenv and install deps
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -U pip
-python -m pip install -r app/requirements.txt
+1) **(Optional)** create a virtualenv and install deps
+  ```
+  python3 -m venv .venv
+  source .venv/bin/activate
+  python -m pip install -U pip
+  python -m pip install -r app/requirements.txt
+  ```
 
 2) Set DB env vars (script reads these via `os.getenv`)
 - If using the Docker Postgres from this repo:
@@ -64,7 +72,9 @@ python -m pip install -r app/requirements.txt
   ```
 
 3) Run the analysis
-python app/dvdrental_vis.py
+  ```
+  python app/dvdrental_vis.py
+  ```
 
 Charts will appear in `app/OUT/`.
 
@@ -73,13 +83,16 @@ Charts will appear in `app/OUT/`.
 ## Postgres via Docker (simple, recommended)
 
 Start a clean Postgres 16 with persistent storage:
-docker compose up -d postgres
+  ```
+  docker compose up -d postgres
+  ```
 
 Seed data (first boot auto-restores if `initdb/dvdrental.tar` exists).  
 To restore manually into a running DB:
-
-docker compose exec -T postgres bash -lc
-'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" /docker-entrypoint-initdb.d/dvdrental.tar'
+  ```
+  docker compose exec -T postgres bash -lc
+  'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" /docker-entrypoint-initdb.d/dvdrental.tar'
+  ```
 
 Then run locally with `PGHOST=localhost` and `PGPORT=5433` (see above).
 
@@ -88,14 +101,15 @@ Then run locally with `PGHOST=localhost` and `PGPORT=5433` (see above).
 ## (Optional) Run the Python app inside Docker
 
 Build the image once:
-
-docker compose build app
+  ```
+  docker compose build app
+  ```
 
 
 Run on demand (one-shot):
-
-
-docker compose run --rm app python dvdrental_vis.py
+  ```
+  docker compose run --rm app python dvdrental_vis.py
+  ```
 
 
 Inside containers the app connects with `PGHOST=postgres`, `PGPORT=5432` (set in `docker-compose.yml`).
