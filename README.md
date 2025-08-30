@@ -12,9 +12,9 @@ The project is **Python-first**; **Docker** is used only to provide a reproducib
 - Store performance: side-by-side comparisons (volume, revenue proxy).
 - Catalog structure: film length groups, category mix, duration quartiles.
 - Talent/credits: top actors by number of films.
-- Heatmaps & trends: monthly stacked views; pivoted line charts.
+- Trends: monthly stacked views; pivoted line charts.
 
-Plots are written to `app/OUT/`.
+Plots are written to `app/out/`.
 
 ---
 
@@ -22,7 +22,7 @@ Plots are written to `app/OUT/`.
 
 1) SQL lives in `app/queries/` and is loaded via a tiny helper (`load_sql` in `sql.py`).  
 2) Connection uses SQLAlchemy; credentials come from environment variables (no `.env`).  
-3) Pandas transforms; Matplotlib (Agg) saves charts to `app/OUT/`.
+3) Pandas transforms; Matplotlib (Agg) saves charts to `app/out/`.
 
 ---
 
@@ -84,7 +84,7 @@ Prereqs: Python 3.11+
   python app/dvdrental_vis.py
   ```
 
-Charts will appear in `app/OUT/`.
+Charts will appear in `app/out/`.
 
 ---
 
@@ -137,13 +137,13 @@ Inside containers the app connects with `PGHOST=postgres`, `PGPORT=5432` (set in
 
 - Script “worked without tar”: you likely hit a different DB. Use `PGPORT=5433` when talking to the Docker Postgres from your host.
 - Missing tables (e.g., `film`): restore the dataset (see Docker section).
-- Inside container “connection refused”: use `PGHOST=postgres` (service name), not `localhost`.
+- Auth failures: double-check `PGUSER/PGPASSWORD` in your shell or `.env`.
 
 ---
 
 ## Presentation
 
-A short PDF with highlights is included in the repo (see `docs/` or project root).
+A short PDF with highlights is included in the repo as dvdrental_presentation.pdf .
 
 
 
