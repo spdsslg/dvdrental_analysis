@@ -11,6 +11,25 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./initdb:/docker-entrypoint-initdb.d
+
+  app:
+    build:
+      context: ./app
+    container_name: dvdrental_app
+    depends_on:
+      - postgres
+    environment:
+      #talking to db via docker 
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: dvdrental
+      MPLBACKEND: Agg
+    volumes:
+      - ./app:/app
+    working_dir: /app
+    command: ["python", "dvdrental_vis.py"]
   
 volumes:
   pgdata:
