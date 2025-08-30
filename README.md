@@ -30,6 +30,7 @@ Plots are written to `app/OUT/`.
 ```
 dvdrental_visualisation/
 ├─ docker-compose.yml                     # Compose file (postgres, optional app)
+├─ dvdrental_presentation.pdf
 ├─ initdb/
 │  ├─ dvdrental.tar                       # Dataset dump (pg_dump custom format)
 │  └─ load.sh                             # Auto-restore dvdrental.tar on first DB init
@@ -37,18 +38,22 @@ dvdrental_visualisation/
    ├─ Dockerfile
    ├─ requirements.txt                    # pandas, matplotlib, SQLAlchemy>=2.0, psycopg2-binary, python-dotenv
    ├─ dvdrental_vis.py                    # Main script: orchestrates analyses & saves plots
-   ├─ db.py                               # Engine factory using env vars (os.getenv)
-   ├─ paths.py                            # Paths/constants (e.g., QUERIES_DIR, OUT)
-   ├─ sql.py                              # load_sql() helper
+   ├─ packages/
+   │  ├─__init__.py
+   │  ├─ db_engine_init.py                   # Engine factory using env vars (os.getenv)
+   │  ├─ paths.py                            # Paths/constants (e.g., QUERIES_DIR, OUT)
+   │  ├─ sql.py                              # load_sql() helper
    ├─ queries/
-   │  ├─ count_rentals_per_month_and_store.sql
-   │  ├─ difference_across_monthly_payments.sql
-   │  ├─ family_films_duration_quartiles.sql
-   │  ├─ num_of_films_per_length_group.sql
-   │  └─ top_actors_per_num_of_films.sql
-   └─ OUT/    
+   │  ├─ q1.sql
+   │  ├─ q2.sql
+   │  ├─ q3.sql
+   │  ├─ ... 
+   └─ out/
+      ├─ Q1.png
+      ├─ Q2.png
+      ├─ ...  
 ```
-                         
+
 ---
 
 
