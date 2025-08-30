@@ -27,7 +27,7 @@ Plots are written to `app/OUT/`.
 ---
 
 ## Project structure
-
+```
 dvdrental_visualisation/
 ├─ docker-compose.yml                     # Compose file (postgres, optional app)
 ├─ initdb/
@@ -46,8 +46,11 @@ dvdrental_visualisation/
    │  ├─ family_films_duration_quartiles.sql
    │  ├─ num_of_films_per_length_group.sql
    │  └─ top_actors_per_num_of_films.sql
-   └─ OUT/                             
+   └─ OUT/    
+```
+                         
 ---
+
 
 ## Run locally (Python)
 
